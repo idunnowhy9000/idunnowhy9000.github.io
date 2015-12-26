@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+	<head>
+		<title>Zipf's Law Tester</title>
+		<meta charset="utf-8" />
+		<link rel="stylesheet" href="css/normalize.css" />
+		<link rel="stylesheet" href="css/skeleton.css" />
+	</head>
+	<body>
+		<div class="container">
+			<header>
+				<h3>Zipf's Law Tester</h3>
+			</header>
+			<form>
+				<label for="text">Enter your text below, click generate and see the results.</label>
+				<textarea class="u-full-width" id="text" style="min-height:250px;"></textarea>
+				<button id="gen-table">Table</button>
+				<button id="gen-chart">Chart</button>
+			</form>
+			<section id="table-section">
+				<strong>Table</strong><br>
+				<table class="u-full-width" id="table">
+					<tr>
+						<td>Rank</td>
+						<td>Word</td>
+						<td>Occurences</td>
+					</tr>
+				</table>
+			</section>
+			<section id="chart-section">
+				<strong>Chart</strong><br>
+				<div id="chart"></div>
+			</section>
+		</div>
+		<script src="https://www.google.com/jsapi"></script>
+		<script src="js/lib/jquery-2.1.4.min.js"></script>
+		<script src="js/zipf.js"></script>
+	</body>
+</html>
