@@ -52,8 +52,9 @@
 		data.addColumn('number', 'Occurrences');
 		data.addRows(rows);
 		
-		var chart = new google.charts.Line(document.getElementById('chart'));
+		$('#chart').empty();
 		$('#chart-section').show();
+		var chart = new google.charts.Line(document.getElementById('chart'));
 		chart.draw(data, {
 			chart: {
 				title: "Zipf's law chart"
