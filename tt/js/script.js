@@ -57,6 +57,8 @@
 	DRAW
 	**********************************/
 	Game.draw=function(){
+		if(Game.lost) return alert('You have lost the game!\nScore: '+Game.Player.score);
+		
 		var box=Game.box;
 		box.width=Game.windowW;
 		box.height=Game.windowH;
@@ -98,7 +100,9 @@
 		
 		// player
 		Game.Player.move(Game.cursorX, Infinity);
-		if(Game.Player.width>=Game.windowW||Game.Player.width<=0) Game.lost=1;
+		
+		// lost
+		if(Game.Player.width>=Game.windowW||Game.Player.width<=0||Game.Player.score<=-100) Game.lost=1;
 		
 	}
 	
@@ -106,9 +110,9 @@
 	LOOP
 	**********************************/
 	Game.loop=function(){
-		if(Game.lost||Game.paused) return;
 		Game.logic();
 		Game.draw();
+		if(Game.lost||Game.paused) return;
 		
 		Game.T++;
 		setTimeout(Game.loop, 1000/Game.fps);
@@ -258,8 +262,9 @@
 		this.spawnParticle=function(){
 			var player=Game.Player;
 			var random = Math.random();
+			var active=this.active;
 			var color,collisionFn;
-			if(random<0.4){
+			if((active&&random<0.3)||random<0.4){
 				color='red';
 				collisionFn=function(active){
 					if (active){
@@ -271,7 +276,7 @@
 						player.width+=10;
 					}
 				}
-			} else if(random<0.8){
+			} else if((active&&random<0.6)||random<0.8){
 				color='blue';
 				collisionFn=function(active){
 					if (active){
