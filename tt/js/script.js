@@ -46,8 +46,23 @@
 		Game.started=Date.now();
 		
 		// states
-		Game.lost=0;
-		Game.paused=0;
+		Game.state=0; // 0: playable, 1: lost, 2: paused
+		
+		Game.start();
+	}
+	
+	/**********************************
+	START GAME
+	**********************************/
+	Game.start=function(){
+		Game.state=2
+		alert('Welcome to tt! (prototype)\n' +
+			'How to play:\n'+
+			'-Collect black dots for points\n' +
+			'-Avoid red dots as they add to your width, and blue dots as they subtract your width\n' +
+			'-You lose if your width is zero or maximum\n' +
+			'-Black rows have double effects ie. black dots for 2 points and red dots for -15 width)')
+		Game.state=0;
 		
 		Game.draw();
 		Game.loop();
@@ -57,7 +72,7 @@
 	DRAW
 	**********************************/
 	Game.draw=function(){
-		if(Game.lost) return alert('You have lost the game!\nScore: '+Game.Player.score);
+		if(Game.state===1) return alert('You have lost the game!\nScore: '+Game.Player.score);
 		
 		var box=Game.box;
 		box.width=Game.windowW;
@@ -99,10 +114,10 @@
 		Game.activeRoad.refresh();
 		
 		// player
-		Game.Player.move(Game.cursorX, Infinity);
+		Game.Player.move(Game.cursorX);
 		
 		// lost
-		if(Game.Player.width>=Game.windowW||Game.Player.width<=0||Game.Player.score<=-10) Game.lost=1;
+		if(Game.Player.width>=Game.windowW||Game.Player.width<=0||Game.Player.score<=-10) Game.state=1;
 		
 	}
 	
@@ -112,7 +127,7 @@
 	Game.loop=function(){
 		Game.logic();
 		Game.draw();
-		if(Game.lost||Game.paused) return;
+		if(Game.state!==0) return;
 		
 		Game.T++;
 		setTimeout(Game.loop, 1000/Game.fps);
@@ -157,15 +172,15 @@
 	PLAYER
 	**********************************/
 	Game.Player={
-		x:0,y:0,
+		x:0,
 		width:80,height:25,
 		score:0,
 		color:'green'
 	}
 	
-	Game.Player.move=function(x,y){
+	Game.Player.move=function(x){
 		this.x=Math.min(x,Game.windowW-this.width);
-		this.y=Math.min(y,Game.windowH-this.height);
+		this.y=Game.windowH-this.height;
 	}
 	
 	// draw
@@ -204,8 +219,8 @@
 			
 			for(var i in this.particles){
 				var me=this.particles[i];
-				if(this.active)ctx.fillStyle=me.color[1];
-				else ctx.fillStyle=me.color[0];
+				if(this.active&&me.color==='black') ctx.fillStyle='#fff';
+				else ctx.fillStyle=me.color;
 				ctx.fillRect(me.x,me.y,me.width,me.height);
 			}
 		}
@@ -249,7 +264,6 @@
 		// particles
 		this.particles=[];
 		this.addParticle=function(width,height,color,collisionFn){
-			if(typeof color==='string')color=[color,color];
 			this.particles.push({
 				x:Math.min(this.x+rand(this.width),this.x+this.width-width),
 				y:0,
@@ -264,19 +278,19 @@
 			var random = Math.random();
 			var active=this.active;
 			var color,collisionFn;
-			if(random<0.3){
+			if(random<0.25){
 				color='red';
 				collisionFn=function(active){
 					if (active){
 						player.score-=2;
-						player.width+=15;
+						player.width+=10;
 					}
 					else {
 						player.score--;
-						player.width+=10;
+						player.width+=5;
 					}
 				}
-			} else if(random<0.6){
+			} else if(random<0.5){
 				color='blue';
 				collisionFn=function(active){
 					if (active){
@@ -289,7 +303,7 @@
 					}
 				}
 			} else{
-				color=['#000','#fff'];
+				color='black';
 				collisionFn=function(active){
 					if (active) player.score+=2;
 					else player.score++;
