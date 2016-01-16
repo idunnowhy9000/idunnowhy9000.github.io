@@ -264,7 +264,7 @@
 			var random = Math.random();
 			var active=this.active;
 			var color,collisionFn;
-			if((active&&random<0.3)||random<0.4){
+			if(random<0.3){
 				color='red';
 				collisionFn=function(active){
 					if (active){
@@ -276,7 +276,7 @@
 						player.width+=10;
 					}
 				}
-			} else if((active&&random<0.6)||random<0.8){
+			} else if(random<0.6){
 				color='blue';
 				collisionFn=function(active){
 					if (active){
