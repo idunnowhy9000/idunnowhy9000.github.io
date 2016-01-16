@@ -102,7 +102,7 @@
 		Game.Player.move(Game.cursorX, Infinity);
 		
 		// lost
-		if(Game.Player.width>=Game.windowW||Game.Player.width<=0||Game.Player.score<=-100) Game.lost=1;
+		if(Game.Player.width>=Game.windowW||Game.Player.width<=0||Game.Player.score<=-10) Game.lost=1;
 		
 	}
 	
