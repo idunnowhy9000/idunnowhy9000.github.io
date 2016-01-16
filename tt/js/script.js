@@ -98,7 +98,7 @@
 		
 		// player
 		Game.Player.move(Game.cursorX, Infinity);
-		if(Game.Player.width>=Game.windowW) Game.lost=1;
+		if(Game.Player.width>=Game.windowW||Game.Player.width<=0) Game.lost=1;
 		
 	}
 	
