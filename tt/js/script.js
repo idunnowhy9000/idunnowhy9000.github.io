@@ -323,7 +323,7 @@
 			var random = Math.random();
 			var active=this.active;
 			var color,collisionFn;
-			if(random<0.25){ // red 25% chance
+			if(random<0.3){ // red 25% chance
 				color='red';
 				collisionFn=function(active){
 					if (active){
@@ -335,7 +335,7 @@
 						player.width+=5;
 					}
 				}
-			} else if(random<0.5){ // blue 25% chance
+			} else if(random<0.6){ // blue 25% chance
 				color='blue';
 				collisionFn=function(active){
 					if (active){
