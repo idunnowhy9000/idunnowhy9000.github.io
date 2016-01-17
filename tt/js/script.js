@@ -60,8 +60,8 @@
 			'How to play:\n'+
 			'-Collect black dots for points\n' +
 			'-Avoid red dots as they add to your width, and blue dots as they subtract your width\n' +
-			'-You lose if your width is zero or maximum\n' +
-			'-Black rows have double effects ie. black dots for 2 points and red dots for -15 width)')
+			'-Black rows have double effects ie. black dots for 2 points and red dots for -15 width\n'+
+			'-You lose if your width is zero or maximum\n');
 		Game.state=0;
 		
 		Game.draw();
