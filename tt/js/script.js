@@ -69,10 +69,21 @@
 	}
 	
 	/**********************************
+	LOSE GAME
+	**********************************/
+	Game.lost=function(){
+		if(confirm('You have lost the game!\nScore: '+Game.Player.score+'\nPlay again?')){
+			Game.reset();
+			Game.state=0;
+			Game.loop();
+		}
+	}
+	
+	/**********************************
 	DRAW
 	**********************************/
 	Game.draw=function(){
-		if(Game.state===1) return alert('You have lost the game!\nScore: '+Game.Player.score);
+		if(Game.state===1) return Game.lost();
 		
 		var box=Game.box;
 		box.width=Game.windowW;
@@ -190,9 +201,24 @@
 	}
 	
 	// spawn rate
-	Game.Player.spawnRate=7;
+	Game.Player.spawnRate=8;
 	Game.Player.calcSpawnRate=function(){
-		return Game.Player.spawnRate = Game.Player.score<=1?7:Math.max(Math.floor(Math.log(Game.Player.score)/Math.log(0.1)) + 4,1);
+		return Game.Player.spawnRate = Game.Player.score<=1?7:Math.max(Math.floor(Math.log(Game.Player.score)/Math.log(0.1)) + 6,1);
+	}
+	
+	/**********************************
+	SCORE
+	**********************************/
+	Game.reset=function(){
+		Game.Player.score=0;
+		Game.Player.width=80;
+		Game.Player.height=25;
+		Game.Player.spawnRate=7;
+		
+		for(var i in Game.Roads){
+			me=Game.Roads[i];
+			me.clearParticles();
+		}
 	}
 	
 	/**********************************
@@ -278,7 +304,7 @@
 			var random = Math.random();
 			var active=this.active;
 			var color,collisionFn;
-			if(random<0.25){
+			if(random<0.25){ // red 25% chance
 				color='red';
 				collisionFn=function(active){
 					if (active){
@@ -290,7 +316,7 @@
 						player.width+=5;
 					}
 				}
-			} else if(random<0.5){
+			} else if(random<0.5){ // blue 25% chance
 				color='blue';
 				collisionFn=function(active){
 					if (active){
@@ -316,7 +342,7 @@
 				this.spawnParticle();
 			}
 		}
-		this.clearParticle=function(){
+		this.clearParticles=function(){
 			this.particles=[];
 		}
 		
@@ -324,6 +350,7 @@
 	}
 	
 	Game.generateRoads=function(n){
+		Game.RoadsN=0;
 		for(var i=0;i<n;i++){
 			new Game.Road();
 		}
