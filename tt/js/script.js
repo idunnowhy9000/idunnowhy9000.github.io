@@ -10,6 +10,12 @@
 	
 	function rand(max){return Math.floor(Math.random() * max);}
 	
+	function isTouch(){
+		return (('ontouchstart' in window) ||
+		     (navigator.maxTouchPoints > 0) ||
+		     (navigator.msMaxTouchPoints > 0));
+	}
+	
 	/**********************************
 	DRAW
 	**********************************/
@@ -29,13 +35,24 @@
 			Game.windowH=window.innerHeight;
 		});
 		
+		Game.touchEvents=isTouch();
+		
 		Game.cursorX=0;
 		Game.cursorY=0;
 		Game.mouseDown=0;
-		window.addEventListener('mousemove',function(e){
-			Game.cursorX=e.pageX;
-			Game.cursorY=e.pageY;
-		});
+		
+		if(Game.touchEvents){
+			window.addEventListener('touchmove',function(e){
+				var touchobj=e.changedTouches[0];
+				Game.cursorX=touchobj.pageX;
+				Game.cursorY=touchobj.pageY;
+			});
+		} else{
+			window.addEventListener('mousemove',function(e){
+				Game.cursorX=e.pageX;
+				Game.cursorY=e.pageY;
+			});
+		}
 		window.addEventListener('mousedown',function(){Game.mouseDown=1;});
 		window.addEventListener('mouseup',function(){Game.mouseDown=0;});
 		
