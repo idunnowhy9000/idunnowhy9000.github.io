@@ -43,16 +43,16 @@
 		
 		if(Game.touchEvents){
 			window.addEventListener('touchmove',function(e){
+				e.preventDefault();
 				var touchobj=e.changedTouches[0];
 				Game.cursorX=touchobj.pageX;
 				Game.cursorY=touchobj.pageY;
-				e.preventDefault();
 			});
 		} else{
 			window.addEventListener('mousemove',function(e){
+				e.preventDefault();
 				Game.cursorX=e.pageX;
 				Game.cursorY=e.pageY;
-				e.preventDefault();
 			});
 		}
 		window.addEventListener('mousedown',function(){Game.mouseDown=1;});
