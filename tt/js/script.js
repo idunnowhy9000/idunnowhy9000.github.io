@@ -67,6 +67,9 @@
 		// states
 		Game.state=0; // 0: playable, 1: lost, 2: paused
 		
+		// player
+		Game.Player.calcSpawnRate();
+		
 		Game.start();
 	}
 	
@@ -80,10 +83,8 @@
 			'-Collect black dots for points\n' +
 			'-Avoid red dots as they add to your width, and blue dots as they subtract your width\n' +
 			'-Black rows have double effects ie. black dots for 2 points and red dots for -15 width\n'+
-			'-You lose if your width is zero or maximum\n');
+			'-You lose if your width is zero or maximum');
 		Game.state=0;
-		
-		Game.draw();
 		Game.loop();
 	}
 	
@@ -92,8 +93,8 @@
 	**********************************/
 	Game.lost=function(){
 		if(confirm('You have lost the game!\nScore: '+Game.Player.score+'\nPlay again?')){
-			Game.reset();
 			Game.state=0;
+			Game.reset();
 			Game.loop();
 		}
 	}
@@ -133,18 +134,16 @@
 	LOGIC
 	**********************************/
 	Game.logic=function(){
-		var spawnRate=Game.Player.spawnRate;
-		
 		// roads
 		for (var i in Game.Roads){
 			var me=Game.Roads[i];
 			me.refresh();
-			if(Game.T%spawnRate===0)me.spawnParticle();
 		}
 		Game.activeRoad.refresh();
 		
 		// player
 		Game.Player.move(Game.cursorX);
+		Game.Player.refresh();
 		
 		// lost
 		if(Game.Player.width>=Game.windowW||Game.Player.width<=0||Game.Player.score<=-10) Game.state=1;
@@ -205,6 +204,7 @@
 		x:0,
 		width:80,height:25,
 		score:0,
+		slowdown:1,slowdownTime:0,
 		color:'green'
 	}
 	
@@ -219,23 +219,43 @@
 		ctx.fillRect(this.x,this.y,this.width,this.height);
 	}
 	
+	// refresh
+	Game.Player.refresh=function(){
+		this.color='green';
+		
+		if(this.slowdown&&this.slowdownTime>0){
+			this.color='purple';
+			this.slowdownTime--;
+			if(this.slowdownTime<=0) this.slowdown=1;
+		}
+		
+		if(this.width<=10) this.color='blue';
+		else if(this.width>Game.windowW*0.5) this.color='red';
+	}
+	
 	// spawn rate
-	Game.Player.spawnRate=8;
+	Game.Player.particlesPerFrame=0;
+	Game.Player.particlesPerRoad=0;
 	Game.Player.calcSpawnRate=function(){
-		return Game.Player.spawnRate = Game.Player.score<=1?7:Math.max(Math.floor(Math.log(Game.Player.score)/Math.log(0.1)) + 6,1);
+		Game.Player.particlesPerFrame = Game.Player.score<=0?1:Math.ceil(Math.pow(Game.Player.score, 0.55));
+		Game.Player.particlesPerRoad = Game.Player.particlesPerFrame / Game.RoadsN;
 	}
 	
 	/**********************************
 	SCORE
 	**********************************/
 	Game.reset=function(){
-		Game.Player.score=0;
 		Game.Player.width=80;
 		Game.Player.height=25;
-		Game.Player.spawnRate=7;
+		
+		Game.Player.score=0;
+		Game.Player.calcSpawnRate();
+		
+		Game.slowdown=1;
+		Game.slowdownTime=0;	
 		
 		for(var i in Game.Roads){
-			me=Game.Roads[i];
+			var me=Game.Roads[i];
 			me.clearParticles();
 		}
 	}
@@ -271,11 +291,12 @@
 		}
 		
 		this.refresh=function(){
+			// dimensions + position
 			this.width=Math.floor(Game.windowW/Game.RoadsN);
 			this.height=Game.windowH;
-			
 			this.x=this.id*this.width;
 			
+			// active roads
 			if(Game.activeRoad.current===this.id){
 				this.active=true;
 				this.color='rgba(0,0,0,'+(Game.activeRoad.life/Game.activeRoad.maxLife)+')';
@@ -285,19 +306,25 @@
 				this.color='#fff';
 			}
 			
-			var player=Game.Player;
-			for(var i in this.particles){
-				var me=this.particles[i];
-				var collided=(player.x < me.x + me.width && player.x + player.width > me.x &&
+			// particle spawner
+			if(this.active&&Game.T%3===0) this.spawnParticles();
+			else if(Game.T%5===0) this.spawnParticles();
+			
+			// refresh particles
+			var player=Game.Player, i, me, collided,
+				speed = this.active?15:7;
+			speed*=player.slowdown+1;
+			
+			// collision detection
+			for(i in this.particles){
+				me=this.particles[i];
+				collided=(player.x < me.x + me.width && player.x + player.width > me.x &&
 					player.y < me.y + me.height && player.height + player.y > me.y);
-				var speed=10;
-				if(this.active) speed=20;
 				me.y+=speed;
 				if(collided||me.y>this.height-me.height){
 					if(collided) {
 						if(typeof me.collisionFn==='function') {
-							if(this.active) me.collisionFn(1);
-							else me.collisionFn();
+							me.collisionFn(this.active);
 						}
 						player.calcSpawnRate();
 					}
@@ -318,12 +345,13 @@
 				collisionFn:collisionFn
 			});
 		}
+		
 		this.spawnParticle=function(){
 			var player=Game.Player;
 			var random = Math.random();
 			var active=this.active;
 			var color,collisionFn;
-			if(random<0.3){ // red 25% chance
+			if(random<0.2){ // red 20% chance
 				color='red';
 				collisionFn=function(active){
 					if (active){
@@ -335,7 +363,7 @@
 						player.width+=5;
 					}
 				}
-			} else if(random<0.6){ // blue 25% chance
+			} else if(random<0.4){ // blue 20% chance
 				color='blue';
 				collisionFn=function(active){
 					if (active){
@@ -347,6 +375,19 @@
 						player.width-=10;
 					}
 				}
+			} else if(random<0.425){ // purple 2.5%
+				color='purple';
+				collisionFn=function(active){
+					if(active){
+						player.score-=2;
+						player.slowdown=0.8;
+						player.slowdownTime=Game.fps*1.5;
+					}else{
+						player.score--;
+						player.slowdown=0.9;
+						player.slowdownTime=Game.fps*1;
+					}
+				}
 			} else{
 				color='black';
 				collisionFn=function(active){
@@ -356,11 +397,14 @@
 			}
 			this.addParticle(10,10,color,collisionFn);
 		}
-		this.spawnParticles=function(n){
-			for(var i=0;i<n;i++){
+		
+		this.spawnParticles=function(){
+			var perRoad = Game.Player.particlesPerRoad,i;
+			for(i=0;i<perRoad;i++){
 				this.spawnParticle();
 			}
 		}
+		
 		this.clearParticles=function(){
 			this.particles=[];
 		}
