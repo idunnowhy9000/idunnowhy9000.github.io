@@ -81,6 +81,7 @@
 		alert('Welcome to tt! (prototype)\n' +
 			'How to play:\n'+
 			'-Collect black dots for points\n' +
+			'-Collect purple dots to slow time down (a bit)\n'+
 			'-Avoid red dots as they add to your width, and blue dots as they subtract your width\n' +
 			'-Black rows have double effects ie. black dots for 2 points and red dots for -15 width\n'+
 			'-You lose if your width is zero or maximum');
@@ -307,8 +308,8 @@
 			}
 			
 			// particle spawner
-			if(this.active&&Game.T%3===0) this.spawnParticles();
-			else if(Game.T%5===0) this.spawnParticles();
+			if(this.active&&Game.T%4===0) this.spawnParticles();
+			else if(Game.T%7===0) this.spawnParticles();
 			
 			// refresh particles
 			var player=Game.Player, i, me, collided,
