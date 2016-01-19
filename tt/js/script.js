@@ -385,7 +385,7 @@
 						player.slowdownTime=Game.fps*1.5;
 					}else{
 						player.score--;
-						player.slowdown=0.9;
+						player.slowdown=0.85;
 						player.slowdownTime=Game.fps*1;
 					}
 				}
