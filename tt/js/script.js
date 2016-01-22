@@ -4,17 +4,9 @@
 	DRAW
 	**********************************/
 	function l(id){return document.getElementById(id)}
-	
 	//http://www.paulirish.com/2009/random-hex-color-code-snippets/
 	function randColor(){return'#'+Math.floor(Math.random()*16777215).toString(16);}
-	
 	function rand(max){return Math.floor(Math.random() * max);}
-	
-	function isTouch(){
-		return (('ontouchstart' in window) ||
-		     (navigator.maxTouchPoints > 0) ||
-		     (navigator.msMaxTouchPoints > 0));
-	}
 	
 	/**********************************
 	DRAW
@@ -35,7 +27,8 @@
 			Game.windowH=window.innerHeight;
 		});
 		
-		Game.touchEvents=isTouch();
+		Game.touchEvents=false;
+		if('ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0) Game.touchEvents=true;
 		
 		Game.cursorX=0;
 		Game.cursorY=0;
@@ -61,11 +54,10 @@
 		// roads
 		Game.generateRoads(4);
 		
-		// dates
+		// stats
 		Game.started=Date.now();
-		
-		// states
 		Game.state=0; // 0: playable, 1: lost, 2: paused
+		Game.colorblind = 0;//colorblind mode for sexy beast
 		
 		// player
 		Game.Player.calcSpawnRate();
