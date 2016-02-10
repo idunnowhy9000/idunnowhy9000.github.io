@@ -19,15 +19,15 @@ Game.init=function(){
 	Game.SolarMass = 1.988e30;
 	Game.EarthMass = 5.972e24;
 	Game.JupiterMass = 1.898e27;
+	Game.EarthRadius = 6.37e6;
 	
 	// settings
 	Game.scale = Game.AU/100;
-	Game.radScale = 6.37e6;
-	Game.timeScale = 86400;
+	Game.timeScale = 1;
 	
 	// scene+camera
 	Game.Scene = new THREE.Scene();
-	Game.Camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight);
+	Game.Camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100000);
 	Game.Camera.position.x = 5;
 	window.addEventListener('resize',function(){
 		Game.Camera.aspect = window.innerWidth / window.innerHeight;
@@ -78,7 +78,7 @@ Game.init=function(){
 // INIT SOLAR SYSTEM
 Game.initSolarSystem = function(){
 	// NOTE: obliquity is relative to sun's orbital plane, use (90-deg)/180*Math.PI
-	var sun = new Game.Object(1.9e30,2,new THREE.MeshBasicMaterial({
+	var sun = new Game.Object(1.9e30,695000000,new THREE.MeshBasicMaterial({
 		map: Game.Loader.load('img/sun.jpg')
 	}));
 	sun.rotation.x = 7.25/180*Math.PI;
@@ -88,7 +88,7 @@ Game.initSolarSystem = function(){
 	sunlight.position.copy(sun.P);
 	Game.Scene.add(sunlight);
 	
-	var mercury = new Game.Object(3.3e23,1,new THREE.MeshPhongMaterial({
+	var mercury = new Game.Object(3.3e23,2440000,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/mercury.png'),
 		bumpMap: Game.Loader.load('img/mercury-height.jpg'),
 		bumpScale: 0.01,
@@ -101,7 +101,7 @@ Game.initSolarSystem = function(){
 	mercury.rotation.x = (90-2.11)/180*Math.PI;
 	mercury.aV = 1.97e-7;
 	
-	var venus = new Game.Object(4.8e24,1,new THREE.MeshPhongMaterial({
+	var venus = new Game.Object(4.8e24,6052000,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/venus.jpg'),
 		bumpMap: Game.Loader.load('img/venus-height.jpg'),
 		bumpScale: 0.01
@@ -114,7 +114,7 @@ Game.initSolarSystem = function(){
 	venus.rotation.x = (90-177)/180*Math.PI;
 	venus.aV = 4.76e-8;
 	
-	var earth = new Game.Object(5.9e24,1,new THREE.MeshPhongMaterial({
+	var earth = new Game.Object(5.9e24,Game.EarthRadius,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/earth.jpg'),
 		bumpMap: Game.Loader.load('img/earth-height.jpg'),
 		bumpScale: 0.01
@@ -127,7 +127,7 @@ Game.initSolarSystem = function(){
 	earth.rotation.x = (90-23.5)/180*Math.PI;
 	earth.aV = 7.29e-5; // http://hpiers.obspm.fr/eop-pc/models/constants.html
 	
-	var mars = new Game.Object(6.41e23,1,new THREE.MeshPhongMaterial({
+	var mars = new Game.Object(6.41e23,3397000,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/mars.jpg'),
 		bumpMap: Game.Loader.load('img/mars-height.jpg'),
 		bumpScale: 0.005
@@ -140,7 +140,7 @@ Game.initSolarSystem = function(){
 	mars.rotation.x = (90-25)/180*Math.PI;
 	mars.aV = 1.12e-5;
 	
-	var jupiter = new Game.Object(1.89e27,2,new THREE.MeshPhongMaterial({
+	var jupiter = new Game.Object(1.89e27,71492000,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/jupiter.jpg')
 	}),{
 		parent:sun,
@@ -238,7 +238,7 @@ Game.Object=function(m,r,material,orbit){
 	});
 	
 	// DRAW
-	var geometry = new THREE.SphereGeometry(this.r,64,64);
+	var geometry = new THREE.SphereGeometry(Math.log(this.r)/Math.log(Game.EarthRadius),64,64);
 	if(!material) var material = new THREE.MeshBasicMaterial();
 	
 	this.sphere = new THREE.Mesh(geometry, material);
