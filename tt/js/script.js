@@ -1,4 +1,4 @@
-(function(){
+//(function(){
 	
 	/**********************************
 	DRAW
@@ -28,7 +28,7 @@
 		});
 		
 		Game.touchEvents=false;
-		if('ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0) Game.touchEvents=true;
+		if('ontouchstart' in window && (navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0)) Game.touchEvents=true;
 		
 		Game.cursorX=0;
 		Game.cursorY=0;
@@ -227,11 +227,12 @@
 	}
 	
 	// spawn rate
-	Game.Player.particlesPerFrame=0;
+	Game.Player.particlesPerSec=100;
 	Game.Player.particlesPerRoad=0;
 	Game.Player.calcSpawnRate=function(){
-		Game.Player.particlesPerFrame = Game.Player.score<=0?1:Math.ceil(Math.pow(Game.Player.score, 0.55));
-		Game.Player.particlesPerRoad = Game.Player.particlesPerFrame / Game.RoadsN;
+		//Game.particlesPerSec = Game.Player.score<=0?1:Math.ceil(Math.pow(Game.Player.score, 1.15));
+		Game.Player.particlesPerSec = 100;
+		Game.Player.particlesPerRoad = Game.Player.particlesPerSec / Game.RoadsN;
 	}
 	
 	/**********************************
@@ -300,8 +301,8 @@
 			}
 			
 			// particle spawner
-			if(this.active&&Game.T%4===0) this.spawnParticles();
-			else if(Game.T%7===0) this.spawnParticles();
+			if(this.active) this.spawnParticles(2*Game.Player.particlesPerRoad/Game.fps);
+			else this.spawnParticles(Game.Player.particlesPerRoad/Game.fps);
 			
 			// refresh particles
 			var player=Game.Player, i, me, collided,
@@ -391,8 +392,8 @@
 			this.addParticle(10,10,color,collisionFn);
 		}
 		
-		this.spawnParticles=function(){
-			var perRoad = Game.Player.particlesPerRoad,i;
+		this.spawnParticles=function(particles){
+			var i;
 			for(i=0;i<perRoad;i++){
 				this.spawnParticle();
 			}
@@ -418,4 +419,4 @@
 	Game.init();
 	window.Game=Game;
 
-})();
+//})();

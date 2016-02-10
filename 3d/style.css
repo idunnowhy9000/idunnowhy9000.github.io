@@ -1,0 +1,17 @@
+* {
+	margin: 0;
+	padding:0;
+}
+canvas {
+	position:absolute;
+	top:0;left:0;right:0;bottom:0;
+}
+#props{
+	position:absolute;
+	width:400px;
+	top:0;bottom:0;right:0;
+	display:none;
+}
+#info, #info tr, #info td{
+	border:0 none;
+}
