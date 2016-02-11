@@ -10,6 +10,7 @@ Game.init=function(){
 	Game.fps=30;
 	Game.drawT=0;
 	
+	Game.t=0;
 	Game.deltaT=0;
 	Game.lastUpdated=0;
 	
@@ -23,11 +24,11 @@ Game.init=function(){
 	
 	// settings
 	Game.scale = Game.AU/100;
-	Game.timeScale = 1;
+	Game.timeScale = 86400;
 	
 	// scene+camera
 	Game.Scene = new THREE.Scene();
-	Game.Camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100000);
+	Game.Camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000000);
 	Game.Camera.position.x = 5;
 	window.addEventListener('resize',function(){
 		Game.Camera.aspect = window.innerWidth / window.innerHeight;
@@ -42,7 +43,7 @@ Game.init=function(){
 	// controls
 	Game.Control = new THREE.OrbitControls(Game.Camera, Game.Renderer.domElement);
 	Game.Control.enableDamping = true;
-	Game.Control.dampingFactor = 0.25;
+	Game.Control.dampingFactor = 0.5;
 	
 	// init solar system
 	Game.initSolarSystem();
@@ -77,10 +78,11 @@ Game.init=function(){
 };
 // INIT SOLAR SYSTEM
 Game.initSolarSystem = function(){
-	// NOTE: obliquity is relative to sun's orbital plane, use (90-deg)/180*Math.PI
-	var sun = new Game.Object(1.9e30,695000000,new THREE.MeshBasicMaterial({
-		map: Game.Loader.load('img/sun.jpg')
-	}));
+	// NOTE: obliquity is relative to sun's orbital plane, use (deg-90)/180*Math.PI
+	var sun = new Game.Object(1.9e30,695000000,new THREE.MeshLambertMaterial({
+		map: Game.Loader.load('img/sun.jpg'),
+		emissive : new THREE.Color( 0xdddd33 )
+	}), false);
 	sun.rotation.x = 7.25/180*Math.PI;
 	sun.aV = 4.6e-7;
 	// TODO: directly implement this to Game.Object
@@ -98,7 +100,7 @@ Game.initSolarSystem = function(){
 		e: 0.2,
 		i: 3.38/180*Math.PI
 	});
-	mercury.rotation.x = (90-2.11)/180*Math.PI;
+	mercury.rotation.x = (2.11-90)/180*Math.PI;
 	mercury.aV = 1.97e-7;
 	
 	var venus = new Game.Object(4.8e24,6052000,new THREE.MeshPhongMaterial({
@@ -111,21 +113,36 @@ Game.initSolarSystem = function(){
 		e: 0.006,
 		i: 3.86/180*Math.PI
 	});
-	venus.rotation.x = (90-177)/180*Math.PI;
+	venus.rotation.x = (177-90)/180*Math.PI;
 	venus.aV = 4.76e-8;
 	
 	var earth = new Game.Object(5.9e24,Game.EarthRadius,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/earth.jpg'),
 		bumpMap: Game.Loader.load('img/earth-height.jpg'),
-		bumpScale: 0.01
+		bumpScale: 0.02,
+		specularMap: Game.Loader.load('img/earth-specular.jpg'),
+		specular: new THREE.Color('grey'),
+		shininess: 5
 	}),{
 		parent: sun,
 		a: Game.AU*1,
 		e: 0.02,
 		i: 7.15/180*Math.PI
 	});
-	earth.rotation.x = (90-23.5)/180*Math.PI;
+	earth.rotation.x = (23.5-90)/180*Math.PI;
 	earth.aV = 7.29e-5; // http://hpiers.obspm.fr/eop-pc/models/constants.html
+	
+	/*
+	var moon = new Game.Object(0.073e24,1738100,new THREE.MeshPhongMaterial({
+		map: Game.Loader.load('img/moon.jpg')
+	}),{
+		parent: earth,
+		a: 3.844e8,
+		e: 0.0554,
+		i: 5.14/180*Math.PI
+	});
+	Game.scale = Game.AU/50000;
+	*/
 	
 	var mars = new Game.Object(6.41e23,3397000,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/mars.jpg'),
@@ -137,7 +154,7 @@ Game.initSolarSystem = function(){
 		e:0.09,
 		i:5.65/180*Math.PI
 	});
-	mars.rotation.x = (90-25)/180*Math.PI;
+	mars.rotation.x = (25-90)/180*Math.PI;
 	mars.aV = 1.12e-5;
 	
 	var jupiter = new Game.Object(1.89e27,71492000,new THREE.MeshPhongMaterial({
@@ -148,7 +165,18 @@ Game.initSolarSystem = function(){
 		e:0.05,
 		i:6.09/180*Math.PI
 	});
-	jupiter.rotation.x = (90-3.13)/180*Math.PI;
+	jupiter.rotation.x = (3.13-90)/180*Math.PI;
+	jupiter.aV = 2.79e-5;
+	
+	var jupiter = new Game.Object(1.89e27,71492000,new THREE.MeshPhongMaterial({
+		map: Game.Loader.load('img/jupiter.jpg')
+	}),{
+		parent:sun,
+		a:Game.AU*5.5,
+		e:0.05,
+		i:6.09/180*Math.PI
+	});
+	jupiter.rotation.x = (3.13-90)/180*Math.PI;
 	jupiter.aV = 2.79e-5;
 	
 	Game.focus = sun.sphere.position;
@@ -165,8 +193,10 @@ Game.draw=function(){
 	requestAnimationFrame(Game.draw);
 };
 Game.logic=function(){
-	Game.deltaT=(Date.now()-Game.lastUpdated)/Game.fps;
-	for(var i in Game.Objects){
+	Game.deltaT=((Date.now()-Game.lastUpdated)/Game.fps)*Game.timeScale;
+	
+	Game.calcGForces();
+	for(var i = 0; i < Game.Objects.length; i++){
 		Game.Objects[i].update();
 	}
 	
@@ -175,9 +205,9 @@ Game.logic=function(){
 		Game.Intersects = Game.Raycaster.intersectObjects(Game.Scene.children);
 	}
 	
-	Game.lastUpdated=Date.now();
-	
 	Game.T++;
+	Game.lastUpdated=Date.now();
+	Game.t = Game.T / Game.timeScale;
 	setTimeout(Game.logic,1/Game.fps);
 };
 // OBJECTS
@@ -189,14 +219,22 @@ Game.Object=function(m,r,material,orbit){
 	// ORBITS
 	this.m = m;
 	this.r = r;
+	this.child = [];
+	this.P = new THREE.Vector3(0,0,0); // position
+	this.V = new THREE.Vector3(0,0,0); // velocity
+	this.force = new THREE.Vector3(0,0,0); // velocity
+	
 	if(orbit){
 		this.parent = orbit.parent;
 		this.parent.child.push(this);
 		this.orbit = new Game.Orbit(orbit);
+		
+		this.orbit.update();
+		this.P.copy(this.orbit.P);
+		this.V.copy(this.orbit.V);
+	} else {
+		this.moveable = !!orbit;
 	}
-	this.child = [];
-	this.P = new THREE.Vector3(0,0,0); // position
-	this.V = new THREE.Vector3(0,0,0); // velocity
 
 	this.rotation = new THREE.Euler();
 	this.aV = 0; // angular velocity
@@ -207,38 +245,82 @@ Game.Object=function(m,r,material,orbit){
 	}
 	
 	this.update=function(){
-		if(this.parent){
+		if(this.orbit){
 			this.orbit.update();
-			this.P.copy(this.orbit.P);
-			this.V.copy(this.orbit.V);
+			//this.P.copy(this.orbit.P);
 		}
-		this.rotation.y += this.aV * Game.deltaT*Game.timeScale;
+		this.doForces();
+		
+		// rotation
+		this.rotation.y += this.aV * Game.deltaT;
+		
+		// display
 		this.sphere.position.copy(this.P).divideScalar(Game.scale);
 		this.sphere.rotation.copy(this.rotation);
 	}
 	
+	// GRAVITY
+	var beginPos = new THREE.Vector3();
+	this.doForces = function(){
+		if(!this.orbit) return false;
+		if(this.prevP){
+			beginPos.copy(this.P);
+			this.force.divideScalar(this.m);
+			//this.force.multiplyScalar(Game.deltaT);
+			var vel = this.orbit.P.clone().sub(this.prevP);
+			this.P.add(vel);
+			this.P.add(this.force);
+			this.prevP.copy(this.P);
+		} else {
+			this.prevP = this.P.clone();
+			this.force.divideScalar(this.m);
+			//this.force.multiplyScalar(Game.deltaT);
+			this.V.add(this.force);
+			var vel = this.orbit.V;
+			//vel.multiplyScalar(Game.deltaT);
+			this.P.add(vel);
+		}
+		this.force.x = this.force.y = this.force.z = 0;
+	};
+	
 	// PROPERTIES
 	Object.defineProperties(this, {
 		// PHYSICAL CHARACTERISTICS
-		d: function(){ // density
-			return this.mass / (this.r*this.r*this.r);
+		d: {
+			get: function(){ // density
+				return this.m / (this.r*this.r*this.r);
+			}
 		},
-		c: function(){ // circumference
-			return this.r*this.r;
+		c: {
+			get: function(){ // circumference
+				return this.r*2;
+			},
 		},
-		a: function(){ // surface area
-			return 4*Math.PI*this.r*this.r;
+		a: {
+			get: function(){ // surface area
+				return 4*Math.PI*this.r*this.r;
+			},
 		},
-		v: function(){ // volume
-			return (4/3)*Math.PI*this.r*this.r*this.r;
+		v: {
+			get: function(){ // volume
+				return (4/3)*Math.PI*this.r*this.r*this.r;
+			},
 		},
-		g: function(){ // surface gravity
-			return (Game.G*this.m)/(this.r*this.r);
+		g: {
+			get: function(){ // surface gravity
+				return (Game.G*this.m)/(this.r*this.r);
+			},
+		},
+		rot: {
+			get: function(){ // rotational period
+				return 2*Math.PI/this.aV;
+			}
 		}
 	});
 	
 	// DRAW
 	var geometry = new THREE.SphereGeometry(Math.log(this.r)/Math.log(Game.EarthRadius),64,64);
+	//var geometry = new THREE.SphereGeometry(Math.log(695000000)/Math.log(Game.EarthRadius),64,64);
 	if(!material) var material = new THREE.MeshBasicMaterial();
 	
 	this.sphere = new THREE.Mesh(geometry, material);
@@ -255,6 +337,7 @@ Game.Object=function(m,r,material,orbit){
 		}
 		var material = new THREE.LineBasicMaterial({ color: 0xffffff });
 		this.ellipse = new THREE.Line( geometry, material );
+		if(this.parent) this.ellipse.position.add(this.parent.P).divideScalar(Game.scale);
 		Game.Scene.add(this.ellipse);
 	}
 	this.drawEllipse();
@@ -281,6 +364,7 @@ Game.Orbit = function(options){
 	this.V = new THREE.Vector3(); // velocity
 	this.Vs = 0; // speed scalar
 	this.m = options.m || 0; // mass
+	this.parent = options.parent;
 	this.mp = options.parent.m || 0; // parent mass
 	this.d = 0; // distnce from
 	this.options = options;
@@ -292,12 +376,12 @@ Game.Orbit.prototype = {
 	},
 	update: function(t){
 		if (t) this.M = t*Math.sqrt((Game.G*this.mp)/(this.a*this.a*this.a));
-		else this.M += Game.deltaT*Game.timeScale*Math.sqrt((Game.G*this.mp)/(this.a*this.a*this.a));
+		else this.M += Game.deltaT*Math.sqrt((Game.G*this.mp)/(this.a*this.a*this.a));
 		
 		var target = this.e>0.8 ? Math.PI : this.M, prev;
 		var error = target - this.e*Math.sin(target) - this.M;
 		var maxError = 10e-15;
-		var maxItr = 150;
+		var maxItr = 15;
 		for(var i = 0; i < maxItr; i++){
 			prev = target;
 			target = prev - error/(1-this.e*Math.cos(prev));
@@ -312,18 +396,15 @@ Game.Orbit.prototype = {
 		
 		var op = new THREE.Vector3(Math.cos(this.v), Math.sin(this.v), 0);
 		op.multiplyScalar(this.d);
-		this.P.copy(this.toInertialFrame(op));
-		
-		var ov = new THREE.Vector3(-Math.sin(this.E), Math.sqrt(1-this.e*this.e)*Math.cos(this.E), 0);
-		ov.multiplyScalar(Math.sqrt(Game.G*this.mp*this.a)/this.d);
-		this.V.copy(this.toInertialFrame(ov));
+		this.P.copy(this.toBodycentric(op));
+		this.P.add(this.parent.P);
 		
 		// vis viva
 		this.Vs = Game.G * this.mp * (2/this.d - 1/this.a);
 		
 		return this;
 	},
-	toInertialFrame:function(op){
+	toBodycentric:function(op){
 		var v = new THREE.Vector3();
 		v.x = op.x*(Math.cos(this.w)*Math.cos(this.o) - Math.sin(this.w)*Math.cos(this.i)*Math.sin(this.o)) - op.y*(Math.sin(this.w)*Math.cos(this.o) + Math.cos(this.w)*Math.cos(this.i)*Math.sin(this.o))
 		v.y = op.x*(Math.cos(this.w)*Math.sin(this.o) + Math.sin(this.w)*Math.cos(this.i)*Math.cos(this.o)) + op.y*(Math.cos(this.w)*Math.cos(this.i)*Math.cos(this.o) + Math.sin(this.w)*Math.sin(this.o))
@@ -341,11 +422,31 @@ Game.Orbit.prototype = {
 		return 2*Math.PI*Math.sqrt((this.a*this.a*this.a)/(Game.G*this.mp));
 	}
 };
+// GRAVITY
+Game.calcGForces = function(){
+	//for(var i = 0; i < Game.Objects.length; i++) {Game.Objects[i].force.set(0,0,0);}
+	for(var i = 0; i < Game.Objects.length; i++) {
+		Game.Objects[i].force.x = Game.Objects[i].force.y = Game.Objects[i].force.z = 0;
+		for(var j = 0; j < Game.Objects.length; j++) {
+			if(i === j) continue;
+			var vect = Game.calcGForce(Game.Objects[i], Game.Objects[j]);
+			Game.Objects[i].force.add(vect);
+		}
+	}
+}
+Game.calcGForce = function(body1, body2){
+	var vect = new THREE.Vector3();
+	vect.copy(body1.P).sub(body2.P);
+	var len = vect.lengthSq();
+	vect.normalize();
+	vect.multiplyScalar((Game.G * body1.m * body2.m) / len);
+	return vect;
+}
 // OBJECT SELECTOR
 Game.select = function(sphere){
 	Game.focus = sphere.position;
 	Game.Control.target.copy(Game.focus);
 	Game.doIntersect = true;
-	Game.Control.reset();
+	Game.Control.redolly();
 };
 Game.init();

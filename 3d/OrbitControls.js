@@ -422,7 +422,7 @@ THREE.OrbitControls = function ( object, domElement ) {
 	}
 	this.dollyOut = dollyOut;
 	
-	this.reset = function(){
+	this.redolly = function(){
 		scale = 1;
 		panOffset.set(0,0,0);
 	};
