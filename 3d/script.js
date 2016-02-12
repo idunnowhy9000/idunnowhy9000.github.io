@@ -24,12 +24,14 @@ Game.init=function(){
 	
 	// settings
 	Game.scale = Game.AU/100;
-	Game.timeScale = 86400;
+	Game.timeScale = 60;
 	
 	// scene+camera
 	Game.Scene = new THREE.Scene();
 	Game.Camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000000);
-	Game.Camera.position.x = 5;
+	Game.Camera.position.x = 1.7;
+	Game.Camera.position.y = -33.3;
+	Game.Camera.position.z = -86.8;
 	window.addEventListener('resize',function(){
 		Game.Camera.aspect = window.innerWidth / window.innerHeight;
 		Game.Camera.updateProjectionMatrix();
@@ -79,12 +81,13 @@ Game.init=function(){
 // INIT SOLAR SYSTEM
 Game.initSolarSystem = function(){
 	// NOTE: obliquity is relative to sun's orbital plane, use (deg-90)/180*Math.PI
-	var sun = new Game.Object(1.9e30,695000000,new THREE.MeshLambertMaterial({
-		map: Game.Loader.load('img/sun.jpg'),
-		emissive : new THREE.Color( 0xdddd33 )
+	var sun = new Game.Object(1.9e30,695000000,new THREE.MeshBasicMaterial({
+		map: Game.Loader.load('img/sun.jpg')
 	}), false);
 	sun.rotation.x = 7.25/180*Math.PI;
 	sun.aV = 4.6e-7;
+	sun.doAtmosphere = true;
+	sun.atmosphere.color = [253, 184, 19];
 	// TODO: directly implement this to Game.Object
 	var sunlight = new THREE.PointLight(0xffffff);
 	sunlight.position.copy(sun.P);
@@ -115,6 +118,8 @@ Game.initSolarSystem = function(){
 	});
 	venus.rotation.x = (177-90)/180*Math.PI;
 	venus.aV = 4.76e-8;
+	venus.doAtmosphere = true;
+	venus.atmosphere.color = [255, 165, 0];
 	
 	var earth = new Game.Object(5.9e24,Game.EarthRadius,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/earth.jpg'),
@@ -131,6 +136,8 @@ Game.initSolarSystem = function(){
 	});
 	earth.rotation.x = (23.5-90)/180*Math.PI;
 	earth.aV = 7.29e-5; // http://hpiers.obspm.fr/eop-pc/models/constants.html
+	earth.doAtmosphere = true;
+	earth.atmosphere.color = [135, 206, 225];
 	
 	/*
 	var moon = new Game.Object(0.073e24,1738100,new THREE.MeshPhongMaterial({
@@ -156,6 +163,8 @@ Game.initSolarSystem = function(){
 	});
 	mars.rotation.x = (25-90)/180*Math.PI;
 	mars.aV = 1.12e-5;
+	mars.doAtmosphere = true;
+	mars.atmosphere.color = [200, 148, 64];
 	
 	var jupiter = new Game.Object(1.89e27,71492000,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/jupiter.jpg')
@@ -219,6 +228,7 @@ Game.Object=function(m,r,material,orbit){
 	// ORBITS
 	this.m = m;
 	this.r = r;
+	this.drawR = Math.log(this.r)/Math.log(Game.EarthRadius);
 	this.child = [];
 	this.P = new THREE.Vector3(0,0,0); // position
 	this.V = new THREE.Vector3(0,0,0); // velocity
@@ -257,6 +267,7 @@ Game.Object=function(m,r,material,orbit){
 		// display
 		this.sphere.position.copy(this.P).divideScalar(Game.scale);
 		this.sphere.rotation.copy(this.rotation);
+		if(this.doAtmosphere) this.atmosphere.update();
 	}
 	
 	// GRAVITY
@@ -266,7 +277,7 @@ Game.Object=function(m,r,material,orbit){
 		if(this.prevP){
 			beginPos.copy(this.P);
 			this.force.divideScalar(this.m);
-			//this.force.multiplyScalar(Game.deltaT);
+			this.force.multiplyScalar(Game.deltaT);
 			var vel = this.orbit.P.clone().sub(this.prevP);
 			this.P.add(vel);
 			this.P.add(this.force);
@@ -274,7 +285,7 @@ Game.Object=function(m,r,material,orbit){
 		} else {
 			this.prevP = this.P.clone();
 			this.force.divideScalar(this.m);
-			//this.force.multiplyScalar(Game.deltaT);
+			this.force.multiplyScalar(Game.deltaT);
 			this.V.add(this.force);
 			var vel = this.orbit.V;
 			//vel.multiplyScalar(Game.deltaT);
@@ -319,14 +330,17 @@ Game.Object=function(m,r,material,orbit){
 	});
 	
 	// DRAW
-	var geometry = new THREE.SphereGeometry(Math.log(this.r)/Math.log(Game.EarthRadius),64,64);
-	//var geometry = new THREE.SphereGeometry(Math.log(695000000)/Math.log(Game.EarthRadius),64,64);
+	var geometry = new THREE.SphereGeometry(this.drawR,64,64);
 	if(!material) var material = new THREE.MeshBasicMaterial();
 	
 	this.sphere = new THREE.Mesh(geometry, material);
 	Game.Scene.add(this.sphere);
 	
-	// TODO: orbits
+	// DRAW HALO
+	this.doAtmosphere = false;
+	this.atmosphere = new Game.HaloObject(this);
+	
+	// DRAW ORBITS
 	this.drawEllipse = function(){
 		if(!this.orbit || this.ellipse) return false;
 		var geometry = new THREE.Geometry();
@@ -347,8 +361,73 @@ Game.Object=function(m,r,material,orbit){
 	Game.ObjectsById[this.sphere.id] = this;
 	Game.ObjectsN++;
 	return this;
-}
+};
+// HALO OBJECTS
+Game.HaloObject = function(parent){
+	this.parent = parent;
+	this.color = [135, 206, 225];
+	
+	// DRAW
+	var shader = THREE.HaloShader;
+	var uniforms = 
+		{
+			"uColor": { type: "v4", value: new THREE.Vector4() },
+			"c": { type: "f", value: 0.5 },
+			"p": { type: "f", value: 1.5 }
+		};
+	var geometry = new THREE.SphereGeometry(this.parent.drawR,64,64);
+	var material = new THREE.ShaderMaterial({
+		uniforms: uniforms,
+		vertexShader: shader.vertexShader,
+		fragmentShader: shader.fragmentShader,
+		side: THREE.DoubleSide,
+		transparent: true
+	});
+	
+	this.sphere = new THREE.Mesh(geometry, material);
+	this.sphere.scale.multiplyScalar(1.05);
+	this.sphere.flipSided = true;
+	Game.Scene.add(this.sphere);
+	
+	this.changed = true;
+	this.update = function(){
+		//console.log(this.sphere.position);
+		this.sphere.position.copy(this.parent.P).divideScalar(Game.scale);
+		this.sphere.rotation.copy(this.parent.rotation);
+		if(this.changed) {
+			var color = new THREE.Vector4(this.color[0]/255, this.color[1]/255, this.color[2]/255, 1);
+			uniforms['uColor'].value = color;
+			this.changed = false;
+		}
+	};
+	
+	return this;
+};
+THREE.HaloShader = {
 
+	vertexShader: [
+		'varying vec3 vNormal;',
+		
+		'void main() ',
+		'{',
+			'vec3 vNormal = normalize( normalMatrix * normal );',
+			'gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );',
+		'}',
+	].join("\n"),
+
+	fragmentShader: [
+		'uniform float c;',
+		'uniform float p;',
+		'uniform vec4 uColor;',
+		'varying vec3 vNormal;',
+		'void main() ',
+		'{',
+			'float intensity = pow( c - dot( vNormal, vec3( 0.0, 0.0, 1.0 ) ), p );',
+			'gl_FragColor = uColor * intensity;',
+		'}',
+	].join("\n")
+
+};
 // KEPLER ORBITAL ELEMENTS
 Game.Orbit = function(options){
 	// https://downloads.rene-schwarz.com/download/M001-Keplerian_Orbit_Elements_to_Cartesian_State_Vectors.pdf
@@ -430,6 +509,7 @@ Game.calcGForces = function(){
 		for(var j = 0; j < Game.Objects.length; j++) {
 			if(i === j) continue;
 			var vect = Game.calcGForce(Game.Objects[i], Game.Objects[j]);
+			Game.Objects[j].force.sub(vect);
 			Game.Objects[i].force.add(vect);
 		}
 	}
