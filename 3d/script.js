@@ -1,6 +1,17 @@
 // UTILS
 function getRandomInt(min, max) {return Math.floor(Math.random() * (max - min)) + min;}
 function l(id){return document.getElementById(id);}
+function n(el,text,attr){
+	el = document.createElement(el);
+	if(text) el.textContent = text;
+	if(attr){for(var i in attr) el.setAttribute(i, attr[i]);}
+	return el;
+}
+function clearEl(el){
+	while (el.firstChild) {
+		el.removeChild(el.firstChild);
+	}
+}
 
 // GAME
 var Game={};
@@ -15,16 +26,74 @@ Game.init=function(){
 	Game.lastUpdated=0;
 	
 	// constants
-	Game.AU = 149597870700;
 	Game.G = 6e-11;
+	Game.StefBoltz = 5.67e-8;
+	Game.AU = 149597870700;
+	
 	Game.SolarMass = 1.988e30;
 	Game.EarthMass = 5.972e24;
 	Game.JupiterMass = 1.898e27;
-	Game.EarthRadius = 6.37e6;
+	
+	Game.SolarRadius = 695000000;
+	Game.EarthRadius = 6.371e6;
+	
+	Game.SolarLuminosity = 3.82e26;
+	
+	Game.SolarLifetime = 1e11;
+	
+	// to: n * convert[type][unit]
+	// from: n / convert[type][unit]
+	// if type == temp -> subtract x from n
+	Game.convert = {
+		density:{
+			'kg/m3': 1,
+			'g/cm3': 0.001,
+		},
+		distance:{
+			'm': 1,
+			'km': 0.001,
+			'AU': 1/Game.AU
+		},
+		area:{
+			'm2': 1,
+			'km2': 1e-6
+		},
+		volume:{
+			'm3': 1,
+			'km3': 1e-9
+		},
+		acceleration:{
+			'm/s2': 1,
+			'km/h2': 12960
+		},
+		time:{
+			's': 1,
+			'm': 1/(60),
+			'h': 1/(60*60),
+			'd': 1/(60*60*24),
+			'm': 1/(60*60*24*30),
+			'y': 1/(60*60*24*30*12),
+		},
+		power:{
+			'W': 1
+		},
+		temp:{
+			'K': 1,
+			'C': -273.15,
+			'F': -459.67
+		}
+	};
 	
 	// settings
 	Game.scale = Game.AU/100;
 	Game.timeScale = 60;
+	
+	// DOM
+	Game.$props = l('props');
+	Game.$table = l('info');
+	Game.$name = l('name');
+	Game.$close = l('close');
+	Game.$close.addEventListener('click', Game.unselect);
 	
 	// scene+camera
 	Game.Scene = new THREE.Scene();
@@ -63,10 +132,15 @@ Game.init=function(){
 	function ondblclick(event){
 		if(Game.Intersects[0] && Game.Intersects[0].object && Game.doIntersect) {
 			Game.doIntersect = false;
+			Game.focusOn(Game.Intersects[0].object);
+		}
+	}
+	function onclick(event){
+		if(Game.Intersects[0] && Game.Intersects[0].object && Game.doIntersect) {
+			Game.doIntersect = false;
 			Game.select(Game.Intersects[0].object);
 		}
 	}
-	function onclick(event){}
 	
 	window.addEventListener('mousemove', onmousemove);
 	window.addEventListener('click', onclick);
@@ -81,7 +155,7 @@ Game.init=function(){
 // INIT SOLAR SYSTEM
 Game.initSolarSystem = function(){
 	// NOTE: obliquity is relative to sun's orbital plane, use (deg-90)/180*Math.PI
-	var sun = new Game.Object(1.9e30,695000000,new THREE.MeshBasicMaterial({
+	var sun = new Game.Object(1.988e30,695000000,new THREE.MeshBasicMaterial({
 		map: Game.Loader.load('img/sun.jpg')
 	}), false);
 	sun.rotation.x = 7.25/180*Math.PI;
@@ -138,6 +212,8 @@ Game.initSolarSystem = function(){
 	earth.aV = 7.29e-5; // http://hpiers.obspm.fr/eop-pc/models/constants.html
 	earth.doAtmosphere = true;
 	earth.atmosphere.color = [135, 206, 225];
+	earth.set('albedo', 0.29);
+	earth.set('temperatureAdjustment', 33);
 	
 	/*
 	var moon = new Game.Object(0.073e24,1738100,new THREE.MeshPhongMaterial({
@@ -211,7 +287,7 @@ Game.logic=function(){
 	
 	if(Game.doIntersect) {
 		Game.Raycaster.setFromCamera(Game.Mouse, Game.Camera);
-		Game.Intersects = Game.Raycaster.intersectObjects(Game.Scene.children);
+		Game.Intersects = Game.Raycaster.intersectObjects(Game.Scene.children, true);
 	}
 	
 	Game.T++;
@@ -221,7 +297,6 @@ Game.logic=function(){
 };
 // OBJECTS
 Game.Objects=[];
-Game.ObjectsById = {};
 Game.ObjectsN=0;
 Game.Object=function(m,r,material,orbit){
 	this.id = Game.ObjectsN++;
@@ -295,45 +370,162 @@ Game.Object=function(m,r,material,orbit){
 	};
 	
 	// PROPERTIES
-	Object.defineProperties(this, {
+	var self = this;
+	this.cache = {};
+	this.changed = true;
+	this._cache = function(prop) {
+		if(this.cache[prop]) return this.cache[prop];
+		if(this.props[prop].get) return this.cache[prop] = this.props[prop].get();
+		return this.cache[prop] = this.props[prop].value;
+	}
+	
+	this.recalc = function(prop){
+		delete this.cache[prop];
+		return this._cache(prop);
+	}
+	
+	this.props = {
 		// PHYSICAL CHARACTERISTICS
-		d: {
-			get: function(){ // density
-				return this.m / (this.r*this.r*this.r);
+		mass: {
+			set: function(m){
+				return self.m = m;
+			},
+			get: function(){
+				return self.m;
 			}
 		},
-		c: {
-			get: function(){ // circumference
-				return this.r*2;
+		radius: {
+			set: function(r){
+				return self.r = r;
 			},
-		},
-		a: {
-			get: function(){ // surface area
-				return 4*Math.PI*this.r*this.r;
-			},
-		},
-		v: {
-			get: function(){ // volume
-				return (4/3)*Math.PI*this.r*this.r*this.r;
-			},
-		},
-		g: {
-			get: function(){ // surface gravity
-				return (Game.G*this.m)/(this.r*this.r);
-			},
-		},
-		rot: {
-			get: function(){ // rotational period
-				return 2*Math.PI/this.aV;
+			get: function(){
+				return self.r;
 			}
-		}
-	});
+		},
+		density: {
+			get: function(){
+				return self.m / (self.r*self.r*self.r);
+			},
+			type: 'density'
+		},
+		circumference: {
+			get: function(){
+				return self.r*2;
+			},
+			type: 'distance'
+		},
+		surfaceArea: {
+			get: function(){
+				return 4*Math.PI*self.r*self.r;
+			},
+			type: 'area'
+		},
+		volume: {
+			get: function(){
+				return (4/3)*Math.PI*self.r*self.r*self.r;
+			},
+			type: 'volume'
+		},
+		gravity: {
+			get: function(){
+				return (Game.G*self.m)/(self.r*self.r);
+			},
+			type: 'acceleration'
+		},
+		rotperiod: {
+			get: function(){
+				return 2*Math.PI/self.aV;
+			},
+			type: 'time'
+		},
+		type: {
+			get: function(){
+				var sm = self.m / Game.SolarMass;
+				if(sm > .08) return 1;
+				return 0;
+			}
+		},
+		// STELLAR CHARACTERISTICS
+		r: {
+			get: function(){
+				var sm = self.m / Game.SolarMass;
+				if(sm > .08 && sm < 20) return Math.pow(self.m, 0.8) * Game.SolarRadius;
+				return r;
+			},
+			type: 'distance'
+		},
+		luminosity: {
+			get: function(){
+				var sm = self.m / Game.SolarMass, l;
+				if(sm < .43) l = .23 * Math.pow(sm, 2.3);
+				else if(sm < 2) l = Math.pow(sm, 4);
+				else if(sm < 20) l = 1.5 * Math.pow(sm, 3.5);
+				else l = 3200 * sm;
+				return l * Game.SolarLuminosity;
+			},
+			type: 'power'
+		},
+		lifetime: {
+			get: function(){
+				return (self.get('luminosity') / Game.SolarLuminosity) * Math.pow(self.m / Game.SolarMass, 3.5) * Game.SolarLifetime;
+			},
+			type: 'time'
+		},
+		// PLANETARY CHARACTERISTICS
+		parentStar: {
+			get: function(){
+				var min = Infinity, obj;
+				for(var i = 0; i < Game.Objects.length; i++) {
+					var me = Game.Objects[i];
+					if(me.id === self.id || me.get('type') !== 1) continue;
+					if(self.P.distanceTo(me.P) < min) {
+						obj = me;
+						min = self.P.distanceTo(me.P)
+					}
+				}
+				return obj;
+			},
+		},
+		albedo: {
+			value: 0
+		},
+		temperatureAdjustment: {
+			value: 0,
+			type: 'temp'
+		},
+		// GENERAL
+		temperature: {
+			get: function(){
+				if (self.get('type') === 1) { // stars
+					return Math.pow(self.get('luminosity') / (self.get('surfaceArea') * Game.StefBoltz), 1/4);
+				} else { // planets
+					//console.log(self.parentStar);
+					var parent = self.get('parentStar');
+					var d = parent.P.distanceTo(self.P);
+					return Math.pow(((parent.get('luminosity') * (1 - self.get('albedo'))) / (16 * Math.PI * Game.StefBoltz * d*d)), 1/4) + self.get('temperatureAdjustment');
+				}
+			},
+			type: 'temp'
+		},
+	};
+	
+	this.get = function(prop) {
+		return this._cache(prop);
+	};
+	
+	this.set = function(prop, val) {
+		if(this.props[prop].set) val = this.props[prop].set(val);
+		this.props[prop] = val;
+		this.cache[prop] = val;
+		return val;
+	};
 	
 	// DRAW
 	var geometry = new THREE.SphereGeometry(this.drawR,64,64);
 	if(!material) var material = new THREE.MeshBasicMaterial();
 	
 	this.sphere = new THREE.Mesh(geometry, material);
+	this.sphere.userData.id = this.id;
 	Game.Scene.add(this.sphere);
 	
 	// DRAW HALO
@@ -358,8 +550,6 @@ Game.Object=function(m,r,material,orbit){
 	
 	// ADD TO ARRAY
 	Game.Objects.push(this);
-	Game.ObjectsById[this.sphere.id] = this;
-	Game.ObjectsN++;
 	return this;
 };
 // HALO OBJECTS
@@ -385,6 +575,7 @@ Game.HaloObject = function(parent){
 	});
 	
 	this.sphere = new THREE.Mesh(geometry, material);
+	this.sphere.userData.id = this.parent.id;
 	this.sphere.scale.multiplyScalar(1.05);
 	this.sphere.flipSided = true;
 	Game.Scene.add(this.sphere);
@@ -448,7 +639,6 @@ Game.Orbit = function(options){
 	this.d = 0; // distnce from
 	this.options = options;
 };
-
 Game.Orbit.prototype = {
 	clone: function(){
 		return new Game.Orbit(this.options);
@@ -522,11 +712,45 @@ Game.calcGForce = function(body1, body2){
 	vect.multiplyScalar((Game.G * body1.m * body2.m) / len);
 	return vect;
 }
+// COVNERSION (base unit -> unit)
+Game.convertTo = function(n, type, unit) {
+	if(!Game.convert[type] || !(unit in Game.convert[type])) return n;
+	if(type === 'temp' && unit !== 'K') return n + Game.convert[type][unit];
+	return n * Game.convert[type][unit];
+};
+Game.convertFrom = function(n, type, unit) {
+	if(!Game.convert[type] || !(unit in Game.convert[type])) return n;
+	if(type === 'temp' && unit !== 'K') return n + Game.convert[type][unit];
+	return n / Game.convert[type][unit];
+};
 // OBJECT SELECTOR
 Game.select = function(sphere){
+	Game.doIntersect = true;
+	Game.selection = Game.Objects[sphere.userData.id];
+	if(!Game.selection) return;
+	
+	// DISPLAY PROPS
+	clearEl(Game.$table);
+	for(var i in Game.selection.props) {
+		var prop = Game.selection.props[i];
+		var val = Game.selection.get(i);
+		if(val === undefined) continue;
+
+		var el = n('tr');
+		el.appendChild(n('td', i));
+		el.appendChild(n('td', val));
+		
+		Game.$table.appendChild(el);
+	}
+	Game.$props.style.display = 'block';
+};
+Game.unselect = function(){
+	Game.$props.style.display = 'none';
+};
+Game.focusOn = function(sphere){
+	Game.doIntersect = true;
 	Game.focus = sphere.position;
 	Game.Control.target.copy(Game.focus);
-	Game.doIntersect = true;
 	Game.Control.redolly();
 };
 Game.init();
