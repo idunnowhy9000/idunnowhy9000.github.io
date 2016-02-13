@@ -1,11 +1,14 @@
 * {
 	margin: 0;
 	padding:0;
+	overflow:hidden;
 }
+/* */
 canvas {
 	position:absolute;
 	top:0;left:0;right:0;bottom:0;
 }
+/* */
 #props{
 	position:absolute;
 	width:320px;
@@ -13,7 +16,19 @@ canvas {
 	display:none;
 	background-color:#fff;
 	z-index: 99;
+	overflow:auto;
+	max-height:100%;
 }
 #info, #info tr, #info td{
 	border:0 none;
+}
+/* */
+#tooltip div{
+	position: absolute;
+	color: white;
+	text-shadow:
+		-1px -1px 0 #000,  
+		1px -1px 0 #000,
+		-1px 1px 0 #000,
+		1px 1px 0 #000;
 }

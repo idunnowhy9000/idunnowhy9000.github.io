@@ -1,3 +1,5 @@
+(function(){
+
 // UTILS
 function getRandomInt(min, max) {return Math.floor(Math.random() * (max - min)) + min;}
 function $(id){return document.getElementById(id);}
@@ -96,6 +98,7 @@ Game.init=function(){
 	// settings
 	Game.scale = Game.AU/100;
 	Game.timeScale = 60;
+	Game.showLabels = true;
 	
 	// DOM
 	Game.$props = $('props');
@@ -114,6 +117,7 @@ Game.init=function(){
 		Game.Camera.aspect = window.innerWidth / window.innerHeight;
 		Game.Camera.updateProjectionMatrix();
 		Game.Renderer.setSize( window.innerWidth, window.innerHeight );
+		Game.LabelRenderer.setSize( window.innerWidth, window.innerHeight );
 	});
 	
 	Game.Renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
@@ -124,6 +128,12 @@ Game.init=function(){
 	Game.Control = new THREE.OrbitControls(Game.Camera, Game.Renderer.domElement);
 	Game.Control.enableDamping = true;
 	Game.Control.dampingFactor = 0.5;
+	
+	// tooltip
+	Game.LabelRenderer = new THREE.CSS2DRenderer();
+	Game.LabelRenderer.setSize( window.innerWidth, window.innerHeight );
+	Game.LabelRenderer.domElement.id = 'tooltip';
+	$('wrapper').appendChild(Game.LabelRenderer.domElement);
 	
 	// init solar system
 	Game.initSolarSystem();
@@ -163,20 +173,18 @@ Game.init=function(){
 };
 // INIT SOLAR SYSTEM
 Game.initSolarSystem = function(){
-	// NOTE: obliquity is relative to sun's orbital plane, use (deg-90)/180*Math.PI
-	var sun = new Game.Object(1.988e30,695000000,new THREE.MeshBasicMaterial({
+	// NOTE: obliquity is relative to sun's orbital plane, use (90-deg)/180*Math.PI
+	var sun = new Game.Object('Sun', Game.SolarMass,Game.SolarRadius,new THREE.MeshBasicMaterial({
 		map: Game.Loader.load('img/sun.jpg')
-	}), false);
-	sun.rotation.x = 7.25/180*Math.PI;
+	}));
+	sun.rotation.x = 67.23/180*Math.PI;
 	sun.aV = 4.6e-7;
-	sun.doAtmosphere = true;
-	sun.atmosphere.color = [253, 184, 19];
 	// TODO: directly implement this to Game.Object
-	var sunlight = new THREE.PointLight(0xffffff);
-	sunlight.position.copy(sun.P);
+	var sunlight = new THREE.PointLight(0xffffff, 1, 0, 100);
+	sunlight.position.set(0,0,0);
 	Game.Scene.add(sunlight);
 	
-	var mercury = new Game.Object(3.3e23,2440000,new THREE.MeshPhongMaterial({
+	var mercury = new Game.Object('Mercury', 3.3e23,2440000,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/mercury.png'),
 		bumpMap: Game.Loader.load('img/mercury-height.jpg'),
 		bumpScale: 0.01,
@@ -186,10 +194,11 @@ Game.initSolarSystem = function(){
 		e: 0.2,
 		i: 3.38/180*Math.PI
 	});
-	mercury.rotation.x = (2.11-90)/180*Math.PI;
+	mercury.rotation.x = (90-2.11)/180*Math.PI;
 	mercury.aV = 1.97e-7;
+	mercury.set('albedo', 0.06);
 	
-	var venus = new Game.Object(4.8e24,6052000,new THREE.MeshPhongMaterial({
+	var venus = new Game.Object('Venus', 4.8e24,6052000,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/venus.jpg'),
 		bumpMap: Game.Loader.load('img/venus-height.jpg'),
 		bumpScale: 0.01
@@ -199,12 +208,14 @@ Game.initSolarSystem = function(){
 		e: 0.006,
 		i: 3.86/180*Math.PI
 	});
-	venus.rotation.x = (177-90)/180*Math.PI;
+	venus.rotation.x = (90-177)/180*Math.PI;
 	venus.aV = 4.76e-8;
 	venus.doAtmosphere = true;
 	venus.atmosphere.color = [255, 165, 0];
+	venus.set('albedo', 0.9);
+	venus.set('temperatureAdjustment', 553);
 	
-	var earth = new Game.Object(Game.EarthMass,Game.EarthRadius,new THREE.MeshPhongMaterial({
+	var earth = new Game.Object('Earth', Game.EarthMass,Game.EarthRadius,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/earth.jpg'),
 		bumpMap: Game.Loader.load('img/earth-height.jpg'),
 		bumpScale: 0.02,
@@ -217,11 +228,11 @@ Game.initSolarSystem = function(){
 		e: 0.02,
 		i: 7.15/180*Math.PI
 	});
-	earth.rotation.x = (23.5-90)/180*Math.PI;
+	earth.rotation.x = (90-23.5)/180*Math.PI;
 	earth.aV = 7.29e-5; // http://hpiers.obspm.fr/eop-pc/models/constants.html
 	earth.doAtmosphere = true;
 	earth.atmosphere.color = [135, 206, 225];
-	earth.set('albedo', 0.29);
+	earth.set('albedo', 0.3);
 	earth.set('temperatureAdjustment', 33);
 	
 	/*
@@ -236,7 +247,7 @@ Game.initSolarSystem = function(){
 	Game.scale = Game.AU/50000;
 	*/
 	
-	var mars = new Game.Object(6.41e23,3397000,new THREE.MeshPhongMaterial({
+	var mars = new Game.Object('Mars', 6.41e23,3397000,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/mars.jpg'),
 		bumpMap: Game.Loader.load('img/mars-height.jpg'),
 		bumpScale: 0.005
@@ -246,12 +257,14 @@ Game.initSolarSystem = function(){
 		e:0.09,
 		i:5.65/180*Math.PI
 	});
-	mars.rotation.x = (25-90)/180*Math.PI;
+	mars.rotation.x = (90-25)/180*Math.PI;
 	mars.aV = 1.12e-5;
 	mars.doAtmosphere = true;
 	mars.atmosphere.color = [200, 148, 64];
+	mars.set('albedo', 0.17);
+	//mars.set('', )
 	
-	var jupiter = new Game.Object(1.89e27,71492000,new THREE.MeshPhongMaterial({
+	var jupiter = new Game.Object('Jupiter', 1.89e27,71492000,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/jupiter.jpg')
 	}),{
 		parent:sun,
@@ -259,19 +272,41 @@ Game.initSolarSystem = function(){
 		e:0.05,
 		i:6.09/180*Math.PI
 	});
-	jupiter.rotation.x = (3.13-90)/180*Math.PI;
+	jupiter.rotation.x = (90-3.13)/180*Math.PI;
 	jupiter.aV = 2.79e-5;
 	
-	var jupiter = new Game.Object(1.89e27,71492000,new THREE.MeshPhongMaterial({
-		map: Game.Loader.load('img/jupiter.jpg')
+	var saturn = new Game.Object('Saturn', 5.68e26,60268000,new THREE.MeshPhongMaterial({
+		map: Game.Loader.load('img/saturn.jpg')
 	}),{
 		parent:sun,
-		a:Game.AU*5.5,
-		e:0.05,
-		i:6.09/180*Math.PI
+		a:Game.AU*9.53,
+		e:0.054,
+		i:5.51/180*Math.PI
 	});
-	jupiter.rotation.x = (3.13-90)/180*Math.PI;
-	jupiter.aV = 2.79e-5;
+	saturn.rotation.x = (90-3.13)/180*Math.PI;
+	saturn.aV = 2.606e-5;
+	
+	var uranus /* (insert joke here) */ = new Game.Object('Uranus', 8.68e25,25559000,new THREE.MeshPhongMaterial({
+		map: Game.Loader.load('img/uranus.jpg')
+	}),{
+		parent:sun,
+		a:Game.AU*19.218,
+		e:0.046,
+		i:6.48/180*Math.PI
+	});
+	uranus.rotation.x = (90-97.7)/180*Math.PI;
+	uranus.aV = 1.6112e-5;
+	
+	var neptune = new Game.Object('Neptune', 5.68e26,60268000,new THREE.MeshPhongMaterial({
+		map: Game.Loader.load('img/neptune.jpg')
+	}),{
+		parent:sun,
+		a:Game.AU*30.1103,
+		e:0.009,
+		i:6.43/180*Math.PI
+	});
+	neptune.rotation.x = (90-28.32)/180*Math.PI;
+	neptune.aV = 1.724e-5;
 	
 	Game.focus = sun.sphere.position;
 };
@@ -284,6 +319,7 @@ Game.draw=function(){
 	Game.Control.update();
 	
 	Game.Renderer.render(Game.Scene, Game.Camera);
+	if(Game.showLabels) Game.LabelRenderer.render(Game.Scene, Game.Camera);
 	
 	Game.drawT++;
 	requestAnimationFrame(Game.draw);
@@ -309,8 +345,10 @@ Game.logic=function(){
 // OBJECTS
 Game.Objects=[];
 Game.ObjectsN=0;
-Game.Object=function(m,r,material,orbit){
+Game.Object=function(name,m,r,material,orbit){
 	this.id = Game.ObjectsN++;
+	this.name = name;
+	
 	// ORBITS
 	this.m = m;
 	this.r = r;
@@ -357,6 +395,7 @@ Game.Object=function(m,r,material,orbit){
 		this.sphere.position.copy(this.P).divideScalar(Game.scale);
 		this.sphere.rotation.copy(this.rotation);
 		if(this.doAtmosphere) this.atmosphere.update();
+		if(Game.showLabels) this.label.position.copy(this.sphere.position);
 	}
 	
 	// GRAVITY
@@ -553,6 +592,14 @@ Game.Object=function(m,r,material,orbit){
 	this.doAtmosphere = false;
 	this.atmosphere = new Game.HaloObject(this);
 	
+	// DRAW CLOUDS
+	this.doClouds = false;
+	var geometry = new THREE.SphereGeometry(this.drawR,64,64);
+	if(!material) var material = new THREE.MeshBasicMaterial();
+	
+	this.cloud = new THREE.Mesh(geometry, material);
+	Game.Scene.add(this.cloud);
+	
 	// DRAW ORBITS
 	this.drawEllipse = function(){
 		if(!this.orbit || this.ellipse) return false;
@@ -569,6 +616,12 @@ Game.Object=function(m,r,material,orbit){
 	}
 	this.drawEllipse();
 	
+	// DRAW TOOLTIP
+	var el = _('div', this.name);
+	el.addEventListener('click', function(){ Game.focusOn(self.sphere); });
+	this.label = new THREE.CSS2DObject(el);
+	Game.Scene.add(this.label);
+	
 	// ADD TO ARRAY
 	Game.Objects.push(this);
 	return this;
@@ -580,33 +633,37 @@ Game.HaloObject = function(parent){
 	
 	// DRAW
 	var shader = THREE.HaloShader;
-	var uniforms = 
+	var uniforms = THREE.UniformsUtils.merge(
+		[THREE.UniformsLib['lights'],
 		{
 			"uColor": { type: "v4", value: new THREE.Vector4() },
-			"c": { type: "f", value: 0.5 },
-			"p": { type: "f", value: 1.5 }
-		};
+			"intensity": { type: "f", value: 0.5 }
+		}]);
 	var geometry = new THREE.SphereGeometry(this.parent.drawR,64,64);
 	var material = new THREE.ShaderMaterial({
 		uniforms: uniforms,
 		vertexShader: shader.vertexShader,
 		fragmentShader: shader.fragmentShader,
-		side: THREE.DoubleSide,
-		transparent: true
+		side: THREE.BackSide,
+		transparent: true,
+		depthWrite: false,
+		lights: true
 	});
 	
 	this.sphere = new THREE.Mesh(geometry, material);
 	this.sphere.userData.id = this.parent.id;
 	this.sphere.scale.multiplyScalar(1.05);
 	this.sphere.flipSided = true;
+	this.sphere.visible = parent.visible;
 	Game.Scene.add(this.sphere);
 	
 	this.changed = true;
 	this.update = function(){
 		//console.log(this.sphere.position);
-		this.sphere.position.copy(this.parent.P).divideScalar(Game.scale);
+		this.sphere.position.copy(this.parent.sphere.position);
 		this.sphere.rotation.copy(this.parent.rotation);
 		if(this.changed) {
+			this.sphere.visible = parent.visible;
 			var color = new THREE.Vector4(this.color[0]/255, this.color[1]/255, this.color[2]/255, 1);
 			uniforms['uColor'].value = color;
 			this.changed = false;
@@ -619,23 +676,35 @@ THREE.HaloShader = {
 
 	vertexShader: [
 		'varying vec3 vNormal;',
+		'varying vec3 vPos;',
+		//'varying float intensity;',
 		
 		'void main() ',
 		'{',
-			'vec3 vNormal = normalize( normalMatrix * normal );',
+			'vPos = (modelMatrix * vec4(position, 1.0 )).xyz;',
+			'vNormal = normalize( normalMatrix * normal );',
 			'gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );',
 		'}',
 	].join("\n"),
 
 	fragmentShader: [
-		'uniform float c;',
-		'uniform float p;',
 		'uniform vec4 uColor;',
+		'varying vec3 vPos;',
 		'varying vec3 vNormal;',
-		'void main() ',
-		'{',
-			'float intensity = pow( c - dot( vNormal, vec3( 0.0, 0.0, 1.0 ) ), p );',
-			'gl_FragColor = uColor * intensity;',
+		'uniform float intensity;',
+		
+		'uniform vec3 pointLightColor[MAX_POINT_LIGHTS];',
+		'uniform vec3 pointLightPosition[MAX_POINT_LIGHTS];',
+		'uniform float pointLightDistance[MAX_POINT_LIGHTS];',
+
+		'void main() {',
+			'vec4 addedLights = vec4(0.0,0.0,0.0, 1.0);',
+			'for(int l = 0; l < MAX_POINT_LIGHTS; l++) {',
+				'vec3 lightDirection = normalize(vPos - pointLightPosition[l]);',
+				'addedLights.rgb += clamp(dot(-lightDirection, vNormal), 0.0, 1.0) * pointLightColor[l] ;',
+			'}',
+			'gl_FragColor = mix(uColor, addedLights, addedLights) * intensity;',
+			//'gl_FragColor = mix(uColor, vec4(1.0,1.0,1.0,1.0), (gl_FragCoord.xy / resolution.y));',
 		'}',
 	].join("\n")
 
@@ -747,10 +816,11 @@ Game.convertFrom = function(n, type, unit) {
 // OBJECT SELECTOR
 Game.select = function(sphere){
 	Game.doIntersect = true;
+	if(!Game.Objects[sphere.userData.id]) return;
 	Game.selection = Game.Objects[sphere.userData.id];
-	if(!Game.selection) return;
 	
 	// DISPLAY PROPS
+	$('name').textContent = Game.selection.name;
 	clearEl(Game.$table);
 	for(var i in Game.selection.props) {
 		var prop = Game.selection.props[i];
@@ -815,4 +885,8 @@ Game.focusOn = function(sphere){
 	Game.Control.target.copy(Game.focus);
 	Game.Control.redolly();
 };
+
 Game.init();
+window.Game = Game;
+
+})();
