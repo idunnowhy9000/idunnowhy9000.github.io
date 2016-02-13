@@ -1,7 +1,7 @@
 // UTILS
 function getRandomInt(min, max) {return Math.floor(Math.random() * (max - min)) + min;}
-function l(id){return document.getElementById(id);}
-function n(el,text,attr){
+function $(id){return document.getElementById(id);}
+function _(el,text,attr){
 	el = document.createElement(el);
 	if(text) el.textContent = text;
 	if(attr){for(var i in attr) el.setAttribute(i, attr[i]);}
@@ -31,7 +31,7 @@ Game.init=function(){
 	Game.AU = 149597870700;
 	
 	Game.SolarMass = 1.988e30;
-	Game.EarthMass = 5.972e24;
+	Game.EarthMass = 5.97219e24;
 	Game.JupiterMass = 1.898e27;
 	
 	Game.SolarRadius = 695000000;
@@ -39,12 +39,17 @@ Game.init=function(){
 	
 	Game.SolarLuminosity = 3.82e26;
 	
-	Game.SolarLifetime = 1e11;
+	Game.SolarLifetime = 1e11 * 3.154e+7;
 	
 	// to: n * convert[type][unit]
 	// from: n / convert[type][unit]
 	// if type == temp -> subtract x from n
 	Game.convert = {
+		mass:{
+			'kg': 1,
+			'solar mass': 1/Game.SolarMass,
+			'earth mass': 1/Game.EarthMass,
+		},
 		density:{
 			'kg/m3': 1,
 			'g/cm3': 0.001,
@@ -52,7 +57,9 @@ Game.init=function(){
 		distance:{
 			'm': 1,
 			'km': 0.001,
-			'AU': 1/Game.AU
+			'AU': 1/Game.AU,
+			'solar radius': 1/Game.SolarRadius,
+			'earth radius': 1/Game.EarthRadius,
 		},
 		area:{
 			'm2': 1,
@@ -67,20 +74,22 @@ Game.init=function(){
 			'km/h2': 12960
 		},
 		time:{
-			's': 1,
-			'm': 1/(60),
-			'h': 1/(60*60),
-			'd': 1/(60*60*24),
-			'm': 1/(60*60*24*30),
-			'y': 1/(60*60*24*30*12),
+			'sec': 1,
+			'minutes': 1/60,
+			'hour': 1/1200,
+			'days': 1/86400,
+			'month': 1/2.628e6,
+			'year': 1/3.154e+7,
+			'Gy': 1/3.1556926e16
 		},
 		power:{
-			'W': 1
+			'W': 1,
+			'solar luminosity': 1/Game.SolarLuminosity
 		},
 		temp:{
 			'K': 1,
 			'C': -273.15,
-			'F': -459.67
+			'F': -255.37
 		}
 	};
 	
@@ -89,10 +98,10 @@ Game.init=function(){
 	Game.timeScale = 60;
 	
 	// DOM
-	Game.$props = l('props');
-	Game.$table = l('info');
-	Game.$name = l('name');
-	Game.$close = l('close');
+	Game.$props = $('props');
+	Game.$table = $('info');
+	Game.$name = $('name');
+	Game.$close = $('close');
 	Game.$close.addEventListener('click', Game.unselect);
 	
 	// scene+camera
@@ -109,7 +118,7 @@ Game.init=function(){
 	
 	Game.Renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
 	Game.Renderer.setSize( window.innerWidth, window.innerHeight );
-	l('wrapper').appendChild( Game.Renderer.domElement );
+	$('wrapper').appendChild( Game.Renderer.domElement );
 	
 	// controls
 	Game.Control = new THREE.OrbitControls(Game.Camera, Game.Renderer.domElement);
@@ -195,7 +204,7 @@ Game.initSolarSystem = function(){
 	venus.doAtmosphere = true;
 	venus.atmosphere.color = [255, 165, 0];
 	
-	var earth = new Game.Object(5.9e24,Game.EarthRadius,new THREE.MeshPhongMaterial({
+	var earth = new Game.Object(Game.EarthMass,Game.EarthRadius,new THREE.MeshPhongMaterial({
 		map: Game.Loader.load('img/earth.jpg'),
 		bumpMap: Game.Loader.load('img/earth-height.jpg'),
 		bumpScale: 0.02,
@@ -268,6 +277,8 @@ Game.initSolarSystem = function(){
 };
 // LOGIC
 Game.draw=function(){
+	Game.refreshSelection();
+	
 	Game.Camera.lookAt(Game.focus);
 	Game.Control.goto(Game.focus);
 	Game.Control.update();
@@ -339,6 +350,9 @@ Game.Object=function(m,r,material,orbit){
 		// rotation
 		this.rotation.y += this.aV * Game.deltaT;
 		
+		// properties
+		this.recalc('temperature');
+		
 		// display
 		this.sphere.position.copy(this.P).divideScalar(Game.scale);
 		this.sphere.rotation.copy(this.rotation);
@@ -392,7 +406,9 @@ Game.Object=function(m,r,material,orbit){
 			},
 			get: function(){
 				return self.m;
-			}
+			},
+			value: self.m,
+			type: 'mass'
 		},
 		radius: {
 			set: function(r){
@@ -400,11 +416,13 @@ Game.Object=function(m,r,material,orbit){
 			},
 			get: function(){
 				return self.r;
-			}
+			},
+			value: self.r,
+			type: 'distance'
 		},
 		density: {
 			get: function(){
-				return self.m / (self.r*self.r*self.r);
+				return self.m / self.get('volume');
 			},
 			type: 'density'
 		},
@@ -452,7 +470,8 @@ Game.Object=function(m,r,material,orbit){
 				if(sm > .08 && sm < 20) return Math.pow(self.m, 0.8) * Game.SolarRadius;
 				return r;
 			},
-			type: 'distance'
+			type: 'distance',
+			hide: true
 		},
 		luminosity: {
 			get: function(){
@@ -485,9 +504,11 @@ Game.Object=function(m,r,material,orbit){
 				}
 				return obj;
 			},
+			hide: true
 		},
 		albedo: {
-			value: 0
+			value: 0,
+			type: 'slider'
 		},
 		temperatureAdjustment: {
 			value: 0,
@@ -515,8 +536,8 @@ Game.Object=function(m,r,material,orbit){
 	
 	this.set = function(prop, val) {
 		if(this.props[prop].set) val = this.props[prop].set(val);
-		this.props[prop] = val;
-		this.cache[prop] = val;
+		this.props[prop].value = val;
+		if(this.cache[prop]) this.cache[prop].value = val;
 		return val;
 	};
 	
@@ -734,11 +755,13 @@ Game.select = function(sphere){
 	for(var i in Game.selection.props) {
 		var prop = Game.selection.props[i];
 		var val = Game.selection.get(i);
-		if(val === undefined) continue;
+		if(val === undefined || prop.hide) continue;
 
-		var el = n('tr');
-		el.appendChild(n('td', i));
-		el.appendChild(n('td', val));
+		var el = _('tr');
+		el.appendChild(_('td', i));
+		var td = _('td');
+		td.appendChild(Game.drawUnit(i, val, prop.type));
+		el.appendChild(td);
 		
 		Game.$table.appendChild(el);
 	}
@@ -747,6 +770,45 @@ Game.select = function(sphere){
 Game.unselect = function(){
 	Game.$props.style.display = 'none';
 };
+Game.drawUnit = function(id, val, type){
+	var div = _('div');
+	var input = _('input', null, {
+		type: 'number',
+		value: val,
+		id: ('select-' + id),
+		'data-type': type
+	});
+	div.appendChild(input);
+	
+	if(type && type !== 'slider') {
+		var select = _('select', null, { id: 'select-selector' });
+		for(var i in Game.convert[type]) {
+			var option = _('option', i, { value: i });
+			select.appendChild(option);
+		}
+		select.addEventListener('change', function(){
+			var selected = select.options[select.selectedIndex];
+			input.setAttribute('value', Game.convertTo(val, type, selected.value));
+			input.setAttribute('data-unit', selected.value);
+		});
+		div.appendChild(select);
+	}
+	return div;
+};
+Game.refreshSelection = function(){
+	if(!Game.selection) return;
+	for(var i in Game.selection.props) {
+		var prop = Game.selection.props[i];
+		var val = Game.selection.get(i);
+		if(val === undefined || prop.hide || prop.value !== undefined) continue;
+		if(prop.type && prop.type !== 'slider') {
+			var el = $('select-' + i), select = $('select-selector'),
+			selected = select.options[select.selectedIndex];
+			el.setAttribute('value', Game.convertTo(val, el.dataset.type, el.dataset.unit));
+		}
+	}
+};
+// FOCUS ON OBJECT
 Game.focusOn = function(sphere){
 	Game.doIntersect = true;
 	Game.focus = sphere.position;
